@@ -1,21 +1,21 @@
 ---
 name: dreamhive-bootstrap
-description: "会话启动时自动加载 — 建立 DreamHive 能力和技能调度规则。请勿手动调用。"
+description: "Auto-loaded at session start — establishes DreamHive capabilities and skill dispatch rules. Do not invoke manually."
 version: 1.0.0
 ---
 
-# DreamHive — 智能技能调度
+# DreamHive — Intelligent Skill Dispatch
 
-自动发现、索引、推荐最适合任务的已安装技能，并从使用模式中学习。
+Auto-discovers, indexes, and recommends the best installed skills for each task, and learns from usage patterns.
 
-## 行为规则
+## Behavior Rules
 
-- **复杂任务** → 用 `dreamhive-dispatch` 技能调度最佳技能
-- **发现技能** → 运行 `python3 "$DREAMHIVE" suggest "<任务描述>"`
-- **记录每次调用** → 运行 `python3 "$DREAMHIVE" invoke "<技能>" ok|fail "<上下文>"`
-- **分析模式** → 用户要求优化工作流时，用 `dreamhive-learn`
-- **尊重用户** → 用户覆盖推荐时，遵循用户选择并记录
+- **Complex tasks** → use `dreamhive-dispatch` skill to route to best skills
+- **Discover skills** → run `python3 "$DREAMHIVE" suggest "<task description>"`
+- **Record every invocation** → run `python3 "$DREAMHIVE" invoke "<skill>" ok|fail "<context>"`
+- **Analyze patterns** → when user asks to optimize workflows, use `dreamhive-learn`
+- **Respect user choices** → when user overrides a recommendation, follow their choice and record it
 
-## 命令
+## Commands
 
 `/dreamhive status` · `/dreamhive list` · `/dreamhive suggest` · `/dreamhive learn`

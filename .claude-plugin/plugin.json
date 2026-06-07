@@ -1,9 +1,9 @@
 {
   "name": "dreamhive",
-  "description": "Claude Code 智能技能调度 — 自动发现、索引、调度和进化你的技能。解决安装大量 skill 后的上下文过载问题。",
-  "version": "1.0.0",
+  "description": "Claude Code Intelligent Skill Dispatch — auto-discover, index, dispatch, and evolve your skills. Solves context overload when installing many skills.",
+  "version": "1.0.2",
   "author": {
-    "name": "DreamHive 贡献者"
+    "name": "DreamHive Contributors"
   },
   "license": "MIT",
   "keywords": [

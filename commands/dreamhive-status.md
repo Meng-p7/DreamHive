@@ -1,25 +1,25 @@
 ---
 name: dreamhive-status
-description: "显示 DreamHive 状态 — 技能数量、最近调用、热门技能"
+description: "Show DreamHive status — skill count, recent invocations, top skills"
 argument-hint: ""
 allowed-tools: [Bash]
 ---
 
-# /dreamhive status — 显示集群状态
+# /dreamhive status — Show Cluster Status
 
-用户调用了 `/dreamhive status`。显示 DreamHive 的当前状态。
+The user invoked `/dreamhive status`. Show DreamHive's current status.
 
-## 指令
+## Instructions
 
-1. 运行状态命令:
+1. Run the status command:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" status
 ```
 
-2. 将输出直接展示给用户 — 不要总结或重新格式化。
+2. Show the output directly to the user — do not summarize or reformat.
 
-3. 如果索引显示 0 个技能，提醒用户运行:
+3. If the index shows 0 skills, remind the user to run:
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" index
 ```

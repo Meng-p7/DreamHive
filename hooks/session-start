@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# DreamHive — SessionStart 钩子
-# 每次新的 Claude Code 会话启动时运行:
-#   1. 重建技能索引（快速，约 100ms）
-#   2. 将引导技能和状态摘要注入上下文
+# DreamHive — SessionStart Hook
+# Runs on every new Claude Code session:
+#   1. Rebuild skill index (fast, ~100ms)
+#   2. Inject bootstrap skill and status summary into context
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -11,10 +11,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DREAMHIVE_PY="${PLUGIN_ROOT}/scripts/dreamhive.py"
 
-# 会话启动时重建技能索引
+# Rebuild skill index at session start
 python3 "${DREAMHIVE_PY}" index >/dev/null 2>&1 || true
 
-# 获取紧凑状态
+# Get compact status
 STATUS_JSON=$(python3 "${DREAMHIVE_PY}" json-status 2>&1 || echo '{"total_skills":0,"total_invocations":0}')
 
 TOTAL_SKILLS=$(echo "${STATUS_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_skills',0))" 2>/dev/null || echo "0")
@@ -31,33 +31,33 @@ if recent:
             seen.append(s)
     print(', '.join(seen[-5:]))
 else:
-    print('无')
-" 2>/dev/null || echo "无")
+    print('none')
+" 2>/dev/null || echo "none")
 
-# 读取引导技能内容
-BOOTSTRAP_CONTENT=$(cat "${PLUGIN_ROOT}/skills/dreamhive-bootstrap/SKILL.md" 2>&1 || echo "读取引导技能失败")
+# Read bootstrap skill content
+BOOTSTRAP_CONTENT=$(cat "${PLUGIN_ROOT}/skills/dreamhive-bootstrap/SKILL.md" 2>&1 || echo "Failed to read bootstrap skill")
 
-# 构建上下文：引导技能 + 状态信息
-STATUS_LINE="🐝 DreamHive 已激活: 已索引 ${TOTAL_SKILLS} 个技能，共 ${TOTAL_INVOCATIONS} 次调用。"
-if [ "${RECENT_SKILLS}" != "无" ]; then
-    STATUS_LINE="${STATUS_LINE} 最近使用: ${RECENT_SKILLS}。"
+# Build context: bootstrap skill + status info
+STATUS_LINE="🐝 DreamHive active: ${TOTAL_SKILLS} skills indexed, ${TOTAL_INVOCATIONS} invocations."
+if [ "${RECENT_SKILLS}" != "none" ]; then
+    STATUS_LINE="${STATUS_LINE} Recent: ${RECENT_SKILLS}."
 fi
-STATUS_LINE="${STATUS_LINE} 使用 /dreamhive status 查看详情，/dreamhive suggest 查找技能。"
+STATUS_LINE="${STATUS_LINE} Use /dreamhive status for details, /dreamhive suggest to find skills."
 
 CONTEXT="<EXTREMELY_IMPORTANT>
-你拥有 DreamHive —— 一个智能技能调度系统。
+You have DreamHive — an intelligent skill dispatch system.
 
 ${STATUS_LINE}
 
-以下是你的 'dreamhive:dreamhive-bootstrap' 技能的完整内容:
+Below is your 'dreamhive:dreamhive-bootstrap' skill in full:
 
 ${BOOTSTRAP_CONTENT}
 </EXTREMELY_IMPORTANT>"
 
-# 使用 Python json.dumps 保证输出是合法 JSON 字符串
+# Use Python json.dumps to guarantee valid JSON output
 CONTEXT_ESCAPED=$(printf '%s' "${CONTEXT}" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read())[1:-1])")
 
-# 输出 Claude Code 钩子格式（兼容多平台）
+# Output Claude Code hook format (multi-platform compatible)
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
   printf '{\n  "additional_context": "%s"\n}\n' "${CONTEXT_ESCAPED}"
 elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then

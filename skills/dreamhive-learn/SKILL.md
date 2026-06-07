@@ -1,80 +1,77 @@
 ---
 name: dreamhive-learn
-description: "当用户想要改进集群、从模式中创建新技能，或你检测到可以自动化的重复任务序列时使用"
+description: "Use when the user wants to improve the cluster, create new skills from patterns, or when you detect a repeated task sequence that could be automated"
 ---
 
-# 集群学习 — 自我进化系统
+# Cluster Learning — Self-Evolution System
 
-DreamHive 可以从你的使用模式中学习，并自动建议创建新的组合技能。
+DreamHive learns from usage patterns and can suggest creating new composite skills.
 
-## 使用场景
+## When to Activate
 
-在以下情况激活：
-- 用户要求 "改进技能"、"从历史中学习"、"优化工作流"
-- 你注意到用户在重复执行相同的操作序列
-- 用户做了两次同样的事后说 "为此创建一个技能"
-- 用户调用 `/dreamhive learn`
+- User asks to "improve skills", "learn from history", or "optimize workflows"
+- You notice the user is repeating the same operation sequence
+- User does the same thing twice and says "create a skill for this"
+- User invokes `/dreamhive learn`
 
-## 学习原理
+## How It Works
 
-### 自动模式检测
+### Automatic Pattern Detection
 
-集群追踪每次技能调用，检测：
-- **顺序模式**: 技能 A → B → C 被重复一起使用
-- **频率模式**: 某些技能使用频率远高于其他
-- **上下文模式**: 技能总是在类似的上下文中使用
+The cluster tracks every skill invocation and detects:
+- **Sequential patterns**: Skill A → B → C repeatedly used together
+- **Frequency patterns**: Some skills used far more than others
+- **Context patterns**: Skills always used in similar contexts
 
-### 阈值：3 次重复
+### Threshold: 3 Repetitions
 
-当一个模式出现 ≥3 次时，集群标记它用于创建技能。
+When a pattern appears ≥3 times, the cluster flags it for skill creation.
 
-### 技能生成流程
+### Skill Generation Flow
 
-1. **分析** — 运行学习命令:
+1. **Analyze** — Run the learn command:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" learn
    ```
 
-2. **审查** — 向用户展示检测到的模式和建议。
+2. **Review** — Show detected patterns and suggestions to the user.
 
-3. **生成** — 如果用户同意，生成组合技能:
+3. **Generate** — If user agrees, generate the composite skill:
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" generate <编号>
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" generate <number>
    ```
 
-4. **自定义** — 读取生成的技能并提供改进建议:
-   - 添加更好的描述
-   - 添加前置条件或守卫
-   - 添加错误处理步骤
-   - 重命名为更具描述性的名称
+4. **Customize** — Read the generated skill and suggest improvements:
+   - Better description
+   - Add preconditions or guards
+   - Add error handling steps
+   - Rename to something more descriptive
 
-5. **注册** — 重新索引以纳入新技能:
+5. **Register** — Re-index to include the new skill:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" index
    ```
 
-## 主动学习
+## Proactive Learning
 
-你也可以在用户未要求的情况下建议创建技能:
+You can also suggest creating skills without being asked:
 
-1. 完成一个多步骤任务后，检查是否存在类似模式
-2. 如果你注意到在本次会话中做了多次 "先 X 再 Y"，说:
-   > "我注意到我们做了几次 [X → Y]。要我创建一个组合技能，
-   > 下次一步完成吗？"
+1. After completing a multi-step task, check if similar patterns exist
+2. If you notice you've done "X then Y" multiple times in this session, say:
+   > "I noticed we've done [X → Y] a few times. Want me to create a composite skill to do it in one step next time?"
 
-3. 如果用户同意，根据实际任务上下文生成技能，使用合适的
-   名称和描述。
+3. If the user agrees, generate a skill with appropriate name and description from the actual task context.
 
-## 记录调用
+## Recording Invocations
 
-每次技能使用都应该记录以供学习:
+Every skill use should be recorded for learning:
 
 ```bash
-# 成功
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" invoke "技能名" ok "做了什么"
+# Success
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" invoke "skill-name" ok "what was done"
 
-# 失败
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" invoke "技能名" fail "失败原因"
+# Failure
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" invoke "skill-name" fail "why it failed"
 ```
 
-这些数据驱动未来的推荐和模式检测。
+This data drives future recommendations and pattern detection.

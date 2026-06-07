@@ -1,50 +1,50 @@
 ---
 name: dreamhive-learn
-description: "分析调用历史，检测模式并建议创建新的组合技能"
-argument-hint: "[generate <编号>]"
+description: "Analyze invocation history, detect patterns, and suggest creating new composite skills"
+argument-hint: "[generate <number>]"
 allowed-tools: [Bash, Read, Write]
 ---
 
-# /dreamhive learn — 分析模式与进化
+# /dreamhive learn — Pattern Analysis & Evolution
 
-用户调用了 `/dreamhive learn`。分析技能使用模式，根据重复序列
-建议创建新的组合技能。
+The user invoked `/dreamhive learn`. Analyze skill usage patterns and suggest
+creating new composite skills based on repeated sequences.
 
-## 指令
+## Instructions
 
-### 模式一：分析（默认）
+### Mode 1: Analyze (default)
 
-如果没有参数或 `$ARGUMENTS` 为空:
+If no arguments or `$ARGUMENTS` is empty:
 
-1. 运行模式分析:
+1. Run pattern analysis:
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" learn
 ```
 
-2. 将结果展示给用户。
+2. Show the results to the user.
 
-3. 如果有可用建议，询问用户:
-   > "检测到一个重复模式。要我为建议 #N 自动生成组合技能吗？
-   > 回复编号，或 'all' 生成全部。"
+3. If suggestions are available, ask the user:
+   > "A repeated pattern was detected. Want me to auto-generate a composite
+   > skill for suggestion #N? Reply with the number, or 'all' to generate all."
 
-4. 用户选择编号后，切换到模式二。
+4. Once the user chooses a number, switch to Mode 2.
 
-### 模式二：生成（当 $ARGUMENTS 以 "generate" 开头时）
+### Mode 2: Generate (when $ARGUMENTS starts with "generate")
 
-1. 从 `$ARGUMENTS` 中提取建议编号（例如 "generate 1" → 1）。
+1. Extract the suggestion number from `$ARGUMENTS` (e.g. "generate 1" → 1).
 
-2. 运行生成器:
+2. Run the generator:
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" generate <编号>
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" generate <number>
 ```
 
-3. 显示生成的文件路径。
+3. Show the generated file path.
 
-4. 读取生成的文件并向用户展示内容。
+4. Read the generated file and show its contents to the user.
 
-5. 提供自定义选项 — 编辑描述、重命名、添加上下文等。
+5. Offer customization options — edit description, rename, add context, etc.
 
-6. 生成后，运行 `index` 以纳入新技能:
+6. After generation, run `index` to include the new skill:
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" index
 ```

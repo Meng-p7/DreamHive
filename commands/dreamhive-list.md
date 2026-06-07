@@ -1,30 +1,30 @@
 ---
 name: dreamhive-list
-description: "列出 DreamHive 已索引的所有技能，按来源分组"
-argument-hint: "[过滤词]"
+description: "List all skills indexed by DreamHive, grouped by source"
+argument-hint: "[filter]"
 allowed-tools: [Bash]
 ---
 
-# /dreamhive list — 列出所有已索引技能
+# /dreamhive list — List All Indexed Skills
 
-用户调用了 `/dreamhive list`。显示集群索引中的所有技能。
+The user invoked `/dreamhive list`. Display all skills in the cluster index.
 
-## 指令
+## Instructions
 
-1. 运行列表命令:
+1. Run the list command:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" list
 ```
 
-2. 将输出直接展示给用户。
+2. Show the output directly to the user.
 
-3. 如果用户通过 `$ARGUMENTS` 提供了过滤词，运行:
+3. If the user provided a filter via `$ARGUMENTS`, run:
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" list | grep -i "$ARGUMENTS"
 ```
 
-4. 如果索引为空，建议运行:
+4. If the index is empty, suggest running:
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dreamhive.py" index
 ```

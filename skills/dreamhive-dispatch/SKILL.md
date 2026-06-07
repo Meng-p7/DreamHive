@@ -1,26 +1,26 @@
 ---
 name: dreamhive-dispatch
-description: "当用户的任务可能受益于已安装的技能时使用 — 自动调度最相关的技能，支持将多个技能串联执行"
+description: "Use when a user's task could benefit from installed skills — auto-dispatches the most relevant skills, supports chaining multiple skills"
 ---
 
-# 集群调度 — 智能技能路由
+# Cluster Dispatch — Intelligent Skill Routing
 
-## 触发条件
+## When to Activate
 
-- 任务复杂，可能受益于专业技能
-- 不确定该用哪个技能
-- 任务涉及多个步骤，需要不同技能分别处理
+- Task is complex and could benefit from specialized skills
+- Unsure which skill to use
+- Task involves multiple steps requiring different skills
 
-## 调度流程
+## Dispatch Flow
 
-1. **拆分任务** — 将用户请求拆为子任务，识别每个子任务需要的能力
-2. **查询推荐** — 对每个子任务运行 `python3 "$DREAMHIVE" suggest "<子任务描述>"`
-3. **选择执行** — 选 Top-3 中得分最高者，通过 Skill 工具调用
-4. **串联输出** — 前一步的输出作为后一步的上下文输入
-5. **记录结果** — 每次调用后运行 `python3 "$DREAMHIVE" invoke "<技能>" ok|fail "<上下文>"`
+1. **Split task** — Break user request into sub-tasks, identify required capabilities
+2. **Query recommendations** — For each sub-task, run `python3 "$DREAMHIVE" suggest "<sub-task description>"`
+3. **Select & execute** — Pick the highest-scoring match, invoke via Skill tool
+4. **Chain outputs** — Pass previous step's output as context to the next step
+5. **Record results** — After each invocation, run `python3 "$DREAMHIVE" invoke "<skill>" ok|fail "<context>"`
 
-## 调度规则
+## Dispatch Rules
 
-- 每个任务最多 3 个技能，不过度调度
-- 技能不适用时快速跳过，不强行匹配
-- 用户覆盖推荐时，遵循用户选择并记录
+- Max 3 skills per task — don't over-dispatch
+- Skip skills quickly if they don't fit — don't force a match
+- When user overrides a recommendation, follow their choice and record it

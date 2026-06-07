@@ -57,14 +57,15 @@ def parse_skill_frontmatter(skill_path: Path) -> dict:
         return {}
 
     meta = {}
-    for line in match.group(1).split('\n'):
-        line = line.strip()
-        if ':' in line:
-            key, _, value = line.partition(':')
-            key = key.strip()
-            value = value.strip().strip('"').strip("'")
-            if key in ('name', 'description', 'version'):
-                meta[key] = value
+    block = match.group(1)
+    for key in ('name', 'description', 'version'):
+        # 匹配 key: "quoted value" 或 key: 'quoted value' 或 key: unquoted value
+        m = re.search(
+            rf'^{key}:\s*(?:"([^"]*)"|\'([^\']*)\'|(.*\S))',
+            block, re.MULTILINE
+        )
+        if m:
+            meta[key] = m.group(1) or m.group(2) or m.group(3).strip()
     return meta
 
 
@@ -700,7 +701,7 @@ def format_learn_results() -> str:
             lines.append(f"      触发次数: {s['trigger_count']}")
         lines.append("")
         lines.append("  如需自动生成建议的技能，运行:")
-        lines.append("  python3 dreamhive.py generate <建议编号>")
+        lines.append(f"  python3 {Path(__file__).resolve()} generate <建议编号>")
     else:
         lines.append("  尚未检测到重复模式（需要 ≥3 次出现）。")
 

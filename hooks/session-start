@@ -54,18 +54,8 @@ ${STATUS_LINE}
 ${BOOTSTRAP_CONTENT}
 </EXTREMELY_IMPORTANT>"
 
-# JSON 转义
-escape_for_json() {
-    local s="$1"
-    s="${s//\\/\\\\}"
-    s="${s//\"/\\\"}"
-    s="${s//$'\n'/\\n}"
-    s="${s//$'\r'/\\r}"
-    s="${s//$'\t'/\\t}"
-    printf '%s' "$s"
-}
-
-CONTEXT_ESCAPED=$(escape_for_json "${CONTEXT}")
+# 使用 Python json.dumps 保证输出是合法 JSON 字符串
+CONTEXT_ESCAPED=$(printf '%s' "${CONTEXT}" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read())[1:-1])")
 
 # 输出 Claude Code 钩子格式（兼容多平台）
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then

@@ -104,7 +104,7 @@ claude plugin install dreamhive@dreamhive-marketplace
       触发次数: 4
 
   如需自动生成建议的技能，运行:
-  python3 dreamhive.py generate <建议编号>
+  python3 ~/DreamHive/scripts/dreamhive.py generate <建议编号>
 ```
 
 ## 📋 命令参考
@@ -153,7 +153,7 @@ claude plugin install dreamhive@dreamhive-marketplace
 |------|------|------|
 | 关键词重叠 | 0-40 分 | Jaccard 相似度 + 双向子串匹配 |
 | 名称匹配 | 0-25 分 | 查询中直接/间接包含技能名称 |
-| 文本相似度 | 0-10 分 | SequenceMatcher 模糊匹配描述 |
+| 文本相似度 | 0-20 分 | SequenceMatcher 模糊匹配描述 |
 | 子串命中 | 0-10 分 | 查询词在技能描述中的命中率 |
 | 使用频率 | 0-5 分 | log2(调用次数) — 热门技能小幅加分 |
 
@@ -241,6 +241,15 @@ claude plugin validate ~/DreamHive
 - 更多模式检测策略
 - 状态/列表输出的 UI 改进
 - 与其他插件市场的集成
+
+## 📝 更新日志
+
+### v1.0.1 — 可靠性改进
+
+- **修复 SessionStart 钩子 JSON 转义** — 将手动 bash 字符串替换改为 Python `json.dumps()`，消除特殊字符（引号、反斜杠、换行、控制字符）导致 JSON 输出不合法的风险
+- **增强 YAML 前置元数据解析** — 正确处理带引号的值和值中包含冒号的情况（如 `description: "Use when: starting work"`），提升技能索引准确性
+- **修复 `learn generate` 命令路径** — 统一所有文档和输出中的 CLI 路径为完整绝对路径，用户可直接复制运行
+- **修正评分算法文档** — 文本相似度分值与代码一致（0-20 分）
 
 ## 📄 许可证
 

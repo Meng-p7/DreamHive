@@ -21,7 +21,6 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from difflib import SequenceMatcher
 from collections import Counter
 
 # ── Path Configuration ────────────────────────────────────────────────────
@@ -69,6 +68,24 @@ def parse_skill_frontmatter(skill_path: Path) -> dict:
     return meta
 
 
+def detect_source(skill_path: Path) -> str:
+    """Detect plugin source by walking up to find .claude-plugin/plugin.json."""
+    current = skill_path.parent
+    for _ in range(10):  # Limit traversal depth
+        manifest = current / ".claude-plugin" / "plugin.json"
+        if manifest.exists():
+            try:
+                data = json.loads(manifest.read_text())
+                return data.get("name", "unknown")
+            except (json.JSONDecodeError, OSError):
+                pass
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    return "user"
+
+
 def scan_skills() -> list[dict]:
     """Scan all skill search paths and return a list of skill descriptors."""
     skills = []
@@ -93,17 +110,8 @@ def scan_skills() -> list[dict]:
                 continue
             seen_names.add(name)
 
-            # Determine source (plugin name or "user")
-            source = "user"
-            rel_str = str(rel)
-            # For plugins/cache/ skills, extract plugin name
-            # e.g. superpowers-marketplace/superpowers/5.1.0/skills/foo/SKILL.md
-            if search_path.name == "cache" and "plugins" in str(search_path):
-                parts = list(rel.parts)
-                if len(parts) >= 2:
-                    source = parts[1]  # e.g. "superpowers"
-            elif search_path.name == "skills":
-                source = "user"
+            # Detect source from plugin manifest
+            source = detect_source(skill_file)
 
             # Extract keywords from description and skill name
             desc = meta.get("description", "")
@@ -161,6 +169,53 @@ def extract_keywords(text: str) -> list[str]:
     return list(dict.fromkeys(keywords))  # Preserve order, deduplicate
 
 
+# ── TF-IDF Scoring ───────────────────────────────────────────────────────
+
+def tokenize(text: str) -> list[str]:
+    """Tokenize text into lowercase word tokens for TF-IDF."""
+    if not text:
+        return []
+    return re.findall(r'[a-z][a-z0-9_-]+', text.lower())
+
+
+def compute_doc_freq(skills: list[dict]) -> tuple:
+    """Build document frequency table and per-skill token lists for TF-IDF."""
+    df = Counter()
+    doc_tokens = {}
+    for skill in skills:
+        text = skill.get("description", "") + " " + " ".join(skill.get("keywords", []))
+        tokens = tokenize(text)
+        doc_tokens[skill["name"]] = tokens
+        for term in set(tokens):
+            df[term] += 1
+    return dict(df), doc_tokens
+
+
+def tfidf_similarity(query_tokens: list, doc_tokens: list, df: dict, n_docs: int) -> float:
+    """Compute cosine similarity between query and document using TF-IDF."""
+    if not query_tokens or not doc_tokens:
+        return 0.0
+
+    query_tf = Counter(query_tokens)
+    doc_tf = Counter(doc_tokens)
+    all_terms = set(query_tf.keys()) | set(doc_tf.keys())
+
+    dot = 0.0
+    q_mag = 0.0
+    d_mag = 0.0
+
+    for term in all_terms:
+        idf = math.log2(n_docs / (df.get(term, 0) + 0.5)) + 1.0
+        q_val = query_tf.get(term, 0) * idf
+        d_val = doc_tf.get(term, 0) * idf
+        dot += q_val * d_val
+        q_mag += q_val * q_val
+        d_mag += d_val * d_val
+
+    mag = math.sqrt(q_mag) * math.sqrt(d_mag)
+    return dot / mag if mag else 0.0
+
+
 def build_index():
     """Scan skills and write the index file."""
     ensure_data_dir()
@@ -207,6 +262,9 @@ def load_index() -> dict:
 
 # ── Invocation Tracking ───────────────────────────────────────────────────
 
+ARCHIVE_PATTERN = "invocation-history-*.json"
+
+
 def record_invocation(skill_name: str, result: str = "ok", context: str = ""):
     """Record a skill invocation to the history log."""
     ensure_data_dir()
@@ -214,15 +272,15 @@ def record_invocation(skill_name: str, result: str = "ok", context: str = ""):
 
     entry = {
         "skill": skill_name,
-        "result": result,  # "ok" or "fail"
-        "context": context[:200],  # Truncate to save storage
+        "result": result,
+        "context": context[:200],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     history["entries"].append(entry)
 
-    # Keep only the most recent 500 records
+    # Archive old entries if buffer exceeds 500
     if len(history["entries"]) > 500:
-        history["entries"] = history["entries"][-500:]
+        history = _archive_old_entries(history)
 
     history["total_invocations"] = len(history["entries"])
     HISTORY_FILE.write_text(json.dumps(history, indent=2, ensure_ascii=False))
@@ -231,14 +289,98 @@ def record_invocation(skill_name: str, result: str = "ok", context: str = ""):
     update_skill_stats(skill_name, result)
 
 
-def load_history() -> dict:
-    """Load invocation history."""
+def _archive_old_entries(history: dict) -> dict:
+    """Move entries from previous months to monthly archive files."""
+    entries = history.get("entries", [])
+    if not entries:
+        return history
+
+    # Determine current month from the latest entry
+    try:
+        latest = datetime.fromisoformat(entries[-1]["timestamp"].replace('Z', '+00:00'))
+        current_month = latest.strftime("%Y-%m")
+    except (ValueError, KeyError):
+        return history
+
+    # Split: current month stays, older entries grouped by month
+    current_entries = []
+    by_month = {}
+    for entry in entries:
+        try:
+            ts = datetime.fromisoformat(entry["timestamp"].replace('Z', '+00:00'))
+            month = ts.strftime("%Y-%m")
+        except (ValueError, KeyError):
+            month = current_month
+
+        if month == current_month:
+            current_entries.append(entry)
+        else:
+            by_month.setdefault(month, []).append(entry)
+
+    # Write each month group to its archive file
+    for month, month_entries in by_month.items():
+        archive_file = DATA_DIR / f"invocation-history-{month}.json"
+        if archive_file.exists():
+            try:
+                existing = json.loads(archive_file.read_text())
+                existing_entries = existing.get("entries", [])
+            except (json.JSONDecodeError, OSError):
+                existing_entries = []
+        else:
+            existing_entries = []
+
+        # Merge and deduplicate by (timestamp, skill, context)
+        seen = {(e.get("timestamp",""), e.get("skill",""), e.get("context","")) for e in existing_entries}
+        for e in month_entries:
+            key = (e.get("timestamp",""), e.get("skill",""), e.get("context",""))
+            if key not in seen:
+                existing_entries.append(e)
+                seen.add(key)
+        existing_entries.sort(key=lambda e: e.get("timestamp", ""))
+
+        archive = {"version": 1, "month": month, "entries": existing_entries}
+        archive_file.write_text(json.dumps(archive, indent=2, ensure_ascii=False))
+
+    history["entries"] = current_entries
+    return history
+
+
+def load_history(months_back: int = 0) -> dict:
+    """Load invocation history.
+
+    Args:
+        months_back: How many months of history to load.
+            0 = current active file only (default, fast)
+            N = active file + last N archive months
+           -1 = all archives + active file (full history)
+    """
+    entries = []
+
+    # Load archive files if requested
+    if months_back != 0:
+        archive_files = sorted(DATA_DIR.glob(ARCHIVE_PATTERN))
+        if months_back > 0:
+            # Keep only the N most recent archive files
+            archive_files = archive_files[-months_back:]
+        for f in archive_files:
+            try:
+                data = json.loads(f.read_text())
+                entries.extend(data.get("entries", []))
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    # Load active file
     if HISTORY_FILE.exists():
         try:
-            return json.loads(HISTORY_FILE.read_text())
+            active = json.loads(HISTORY_FILE.read_text())
+            entries.extend(active.get("entries", []))
         except (json.JSONDecodeError, OSError):
             pass
-    return {"version": 1, "entries": [], "total_invocations": 0}
+
+    # Sort by timestamp
+    entries.sort(key=lambda e: e.get("timestamp", ""))
+
+    return {"version": 1, "entries": entries, "total_invocations": len(entries)}
 
 
 def update_skill_stats(skill_name: str, result: str):
@@ -264,8 +406,9 @@ def suggest_skills(query: str, top_n: int = 3) -> list[dict]:
     Uses a hybrid scoring method:
       1. Keyword overlap (with substring tolerance)
       2. Name matching
-      3. Description text similarity
-      4. Usage frequency bonus
+      3. TF-IDF cosine similarity
+      4. Substring hits in description
+      5. Usage frequency bonus
     """
     index = load_index()
     skills = index.get("skills", [])
@@ -277,6 +420,11 @@ def suggest_skills(query: str, top_n: int = 3) -> list[dict]:
     query_words = set(extract_keywords(query_lower))
     # Keep raw words for substring matching
     raw_words = set(re.findall(r'[a-z]{3,}', query_lower))
+
+    # Pre-compute TF-IDF corpus data (once for all skills)
+    n_docs = len(skills)
+    df, doc_tokens_map = compute_doc_freq(skills)
+    query_tokens = tokenize(query_lower)
 
     scored = []
     for skill in skills:
@@ -326,9 +474,10 @@ def suggest_skills(query: str, top_n: int = 3) -> list[dict]:
             elif any(part in query_lower for part in name_parts):
                 score += 10
 
-        # --- Score 3: Description text similarity (0-20) ---
-        sim = SequenceMatcher(None, query_lower[:100], desc[:100]).ratio()
-        score += sim * 20
+        # --- Score 3: TF-IDF cosine similarity (0-20) ---
+        skill_tokens = doc_tokens_map.get(name, [])
+        tfidf_sim = tfidf_similarity(query_tokens, skill_tokens, df, n_docs)
+        score += tfidf_sim * 20
 
         # --- Score 4: Substring hits in description (0-10) ---
         hits = 0
@@ -370,7 +519,7 @@ def analyze_patterns() -> dict:
     Analyze invocation history to find repeated skill sequences.
     Returns detected patterns and suggestions for new composite skills.
     """
-    history = load_history()
+    history = load_history(months_back=3)
     entries = history.get("entries", [])
 
     if len(entries) < 3:

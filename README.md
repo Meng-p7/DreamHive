@@ -48,14 +48,9 @@ claude plugin install dreamhive@dreamhive-marketplace
 🐝 DreamHive — "审查代码并修复 bug" 的最佳匹配
 ============================================================
 
-  #1  requesting-code-review  (得分: 35.2, 已调用 12x)
-      在 PR 上请求代码审查的触发条件
-
-  #2  systematic-debugging  (得分: 28.7, 已调用 8x)
-      四阶段根因调试：先理解问题再修复
-
-  #3  test-driven-development  (得分: 18.3, 已调用 5x)
-      强制红-绿-重构，先写测试再写代码
+  #1  requesting-code-review  (35.2分, 12次)
+  #2  systematic-debugging  (28.7分, 8次)
+  #3  test-driven-development  (18.3分, 5次)
 ```
 
 ### 查看集群状态
@@ -250,6 +245,13 @@ claude plugin validate ~/DreamHive
 - **增强 YAML 前置元数据解析** — 正确处理带引号的值和值中包含冒号的情况（如 `description: "Use when: starting work"`），提升技能索引准确性
 - **修复 `learn generate` 命令路径** — 统一所有文档和输出中的 CLI 路径为完整绝对路径，用户可直接复制运行
 - **修正评分算法文档** — 文本相似度分值与代码一致（0-20 分）
+
+### v1.0.2 — 上下文优化
+
+- **精简 bootstrap 技能** — 从 ~2,600 字节压缩到 ~800 字节（-69%），删除使用示例、CLI 参考和集成说明，保留核心行为规则
+- **精简 suggest 输出** — 每个推荐技能从 3 行压缩到 1 行（名称 + 得分 + 调用次数），Claude 按需读取完整技能描述
+- **精简 dispatch 技能** — 从 ~2,400 字节压缩到 ~1,000 字节（-57%），删除 bash 代码示例和冗余说明
+- **SessionStart 上下文从 ~900 tokens 降至 ~360 tokens**（-60%）
 
 ## 📄 许可证
 

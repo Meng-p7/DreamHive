@@ -625,7 +625,7 @@ def format_list() -> str:
 
 
 def format_suggestions(query: str) -> str:
-    """格式化技能推荐结果。"""
+    """格式化技能推荐结果（紧凑模式）。"""
     suggestions = suggest_skills(query)
 
     if not suggestions:
@@ -638,21 +638,7 @@ def format_suggestions(query: str) -> str:
     ]
 
     for i, s in enumerate(suggestions, 1):
-        lines.append(f"  #{i}  {s['name']}  (得分: {s['score']}, 已调用 {s['call_count']}次)")
-        desc = s.get("description", "")
-        if desc:
-            # 自动换行
-            words = desc.split()
-            line = "      "
-            for word in words:
-                if len(line) + len(word) + 1 > 58:
-                    lines.append(line)
-                    line = "      " + word
-                else:
-                    line += " " + word if line.strip() else "      " + word
-            if line.strip():
-                lines.append(line)
-        lines.append("")
+        lines.append(f"  #{i}  {s['name']}  ({s['score']}分, {s['call_count']}次)")
 
     return "\n".join(lines)
 

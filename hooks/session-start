@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────
+# DreamHive — SessionStart 钩子
+# 每次新的 Claude Code 会话启动时运行:
+#   1. 重建技能索引（快速，约 100ms）
+#   2. 将引导技能和状态摘要注入上下文
+# ─────────────────────────────────────────────────────────────
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DREAMHIVE_PY="${PLUGIN_ROOT}/scripts/dreamhive.py"
+
+# 会话启动时重建技能索引
+python3 "${DREAMHIVE_PY}" index >/dev/null 2>&1 || true
+
+# 获取紧凑状态
+STATUS_JSON=$(python3 "${DREAMHIVE_PY}" json-status 2>&1 || echo '{"total_skills":0,"total_invocations":0}')
+
+TOTAL_SKILLS=$(echo "${STATUS_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_skills',0))" 2>/dev/null || echo "0")
+TOTAL_INVOCATIONS=$(echo "${STATUS_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_invocations',0))" 2>/dev/null || echo "0")
+
+RECENT_SKILLS=$(echo "${STATUS_JSON}" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+recent = d.get('recent_skills', [])
+if recent:
+    seen = []
+    for s in recent:
+        if s not in seen:
+            seen.append(s)
+    print(', '.join(seen[-5:]))
+else:
+    print('无')
+" 2>/dev/null || echo "无")
+
+# 读取引导技能内容
+BOOTSTRAP_CONTENT=$(cat "${PLUGIN_ROOT}/skills/dreamhive-bootstrap/SKILL.md" 2>&1 || echo "读取引导技能失败")
+
+# 构建上下文：引导技能 + 状态信息
+STATUS_LINE="🐝 DreamHive 已激活: 已索引 ${TOTAL_SKILLS} 个技能，共 ${TOTAL_INVOCATIONS} 次调用。"
+if [ "${RECENT_SKILLS}" != "无" ]; then
+    STATUS_LINE="${STATUS_LINE} 最近使用: ${RECENT_SKILLS}。"
+fi
+STATUS_LINE="${STATUS_LINE} 使用 /dreamhive status 查看详情，/dreamhive suggest 查找技能。"
+
+CONTEXT="<EXTREMELY_IMPORTANT>
+你拥有 DreamHive —— 一个智能技能调度系统。
+
+${STATUS_LINE}
+
+以下是你的 'dreamhive:dreamhive-bootstrap' 技能的完整内容:
+
+${BOOTSTRAP_CONTENT}
+</EXTREMELY_IMPORTANT>"
+
+# JSON 转义
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+CONTEXT_ESCAPED=$(escape_for_json "${CONTEXT}")
+
+# 输出 Claude Code 钩子格式（兼容多平台）
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  printf '{\n  "additional_context": "%s"\n}\n' "${CONTEXT_ESCAPED}"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "${CONTEXT_ESCAPED}"
+else
+  printf '{\n  "additionalContext": "%s"\n}\n' "${CONTEXT_ESCAPED}"
+fi
+
+exit 0

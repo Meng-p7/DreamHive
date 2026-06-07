@@ -1,0 +1,5 @@
+# Skill Swarm — Git Ignore
+data/*.json
+__pycache__/
+*.pyc
+.DS_Store

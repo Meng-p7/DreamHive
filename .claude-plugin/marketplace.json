@@ -1,0 +1,22 @@
+{
+    "name": "dreamhive-marketplace",
+    "owner": {
+        "name": "Meng-p7"
+    },
+    "metadata": {
+        "description": "DreamHive — Claude Code 智能技能调度插件",
+        "version": "1.0.0"
+    },
+    "plugins": [
+        {
+            "name": "dreamhive",
+            "source": {
+                "source": "url",
+                "url": "https://github.com/Meng-p7/DreamHive.git"
+            },
+            "description": "Claude Code 智能技能调度 — 自动追踪每次 skill 调用，学习你的操作习惯，检测重复模式后一键生成组合技能。纯本地运行，零依赖。",
+            "version": "1.0.0",
+            "strict": true
+        }
+    ]
+}

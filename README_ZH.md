@@ -44,7 +44,7 @@ claude plugin install dreamhive@dreamhive-marketplace
 ### 发现适合任务的技能
 
 ```
-/dreamhive suggest 审查代码并修复 bug
+/dreamhive-suggest 审查代码并修复 bug
 ```
 
 输出示例：
@@ -60,7 +60,7 @@ claude plugin install dreamhive@dreamhive-marketplace
 ### 查看集群状态
 
 ```
-/dreamhive status
+/dreamhive-status
 ```
 
 输出示例：
@@ -83,7 +83,7 @@ claude plugin install dreamhive@dreamhive-marketplace
 ### 从使用模式中学习
 
 ```
-/dreamhive learn
+/dreamhive-learn
 ```
 
 输出示例：
@@ -111,10 +111,10 @@ claude plugin install dreamhive@dreamhive-marketplace
 
 | 命令 | 说明 |
 |------|------|
-| `/dreamhive status` | 仪表盘：技能数、调用次数、热门技能 |
-| `/dreamhive list [过滤词]` | 列出所有已索引的技能，可选过滤 |
-| `/dreamhive suggest [查询]` | 为任务推荐 Top-3 技能 |
-| `/dreamhive learn [generate N]` | 分析模式，生成组合技能 |
+| `/dreamhive-status` | 仪表盘：技能数、调用次数、热门技能 |
+| `/dreamhive-list [过滤词]` | 列出所有已索引的技能，可选过滤 |
+| `/dreamhive-suggest [查询]` | 为任务推荐 Top-3 技能 |
+| `/dreamhive-learn [generate N]` | 分析模式，生成组合技能 |
 
 ## 🏗️ 系统架构
 
@@ -166,23 +166,24 @@ claude plugin install dreamhive@dreamhive-marketplace
 dreamhive/
 ├── .claude-plugin/
 │   └── plugin.json              # 插件清单
+├── .claude/
+│   ├── commands/
+│   │   ├── dreamhive-status.md      # /dreamhive-status
+│   │   ├── dreamhive-list.md        # /dreamhive-list
+│   │   ├── dreamhive-suggest.md     # /dreamhive-suggest
+│   │   └── dreamhive-learn.md       # /dreamhive-learn
+│   └── skills/
+│       ├── dreamhive-bootstrap/
+│       │   └── SKILL.md             # 会话启动时注入的能力说明
+│       ├── dreamhive-dispatch/
+│       │   └── SKILL.md             # 智能调度技能
+│       └── dreamhive-learn/
+│           └── SKILL.md             # 学习与进化技能
 ├── hooks/
 │   ├── hooks.json               # 钩子配置
 │   └── session-start            # SessionStart 钩子（增量重建索引）
 ├── scripts/
 │   └── dreamhive.py                 # 核心引擎（CLI）
-├── skills/
-│   ├── dreamhive-bootstrap/
-│   │   └── SKILL.md             # 会话启动时注入的能力说明
-│   ├── dreamhive-dispatch/
-│   │   └── SKILL.md             # 智能调度技能
-│   └── dreamhive-learn/
-│       └── SKILL.md             # 学习与进化技能
-├── commands/
-│   ├── dreamhive-status.md          # /dreamhive status
-│   ├── dreamhive-list.md            # /dreamhive list
-│   ├── dreamhive-suggest.md         # /dreamhive suggest
-│   └── dreamhive-learn.md           # /dreamhive learn
 ├── agents/
 │   └── dreamhive-orchestrator.md    # 调度 Agent 定义
 ├── data/                        # 持久化状态（自动生成）
@@ -261,7 +262,7 @@ python3 -m pytest tests/ -v
 - **跨语言匹配** — 中文查询（如"排错"、"部署"、"测试"）通过 `data/term-map.json` 同义词映射（110+ 词条）自动翻译为英文关键词参与评分。中英混合查询同样有效。零依赖，手工维护。
 - **组合技能生成增强** — 自动生成的组合技能新增 `Prerequisites`（从步骤描述自动推断前置条件）、`Context Passing Rules`（步骤间输出传递规则）和 `Error Degradation`（每步失败的降级策略）。这是 DreamHive 学习进化的核心能力。
 - **增量索引** — 会话启动时的索引构建改用 SHA256 文件 hash，仅重新解析内容变化的技能文件。技能数量多时显著提速。
-- **状态面板动态宽度** — `/dreamhive status` 的 box-drawing 改用 `unicodedata.east_asian_width` 动态计算宽度，CJK 字符和 emoji 对齐正确。
+- **状态面板动态宽度** — `/dreamhive-status` 的 box-drawing 改用 `unicodedata.east_asian_width` 动态计算宽度，CJK 字符和 emoji 对齐正确。
 - **测试套件** — 38 个自动化测试覆盖：关键词提取、分词、评分、前置元数据解析、增量索引、状态格式化、组合技能生成、调用归档。
 
 ### v1.1.0 — 评分算法、源检测与历史归档

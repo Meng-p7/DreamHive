@@ -35,14 +35,14 @@ else:
 " 2>/dev/null || echo "none")
 
 # Read bootstrap skill content
-BOOTSTRAP_CONTENT=$(cat "${PLUGIN_ROOT}/skills/dreamhive-bootstrap/SKILL.md" 2>&1 || echo "Failed to read bootstrap skill")
+BOOTSTRAP_CONTENT=$(cat "${PLUGIN_ROOT}/.claude/skills/dreamhive-bootstrap/SKILL.md" 2>&1 || echo "Failed to read bootstrap skill")
 
 # Build context: bootstrap skill + status info
 STATUS_LINE="🐝 DreamHive active: ${TOTAL_SKILLS} skills indexed, ${TOTAL_INVOCATIONS} invocations."
 if [ "${RECENT_SKILLS}" != "none" ]; then
     STATUS_LINE="${STATUS_LINE} Recent: ${RECENT_SKILLS}."
 fi
-STATUS_LINE="${STATUS_LINE} Use /dreamhive status for details, /dreamhive suggest to find skills."
+STATUS_LINE="${STATUS_LINE} Use /dreamhive-status for details, /dreamhive-suggest to find skills."
 
 CONTEXT="<EXTREMELY_IMPORTANT>
 You have DreamHive — an intelligent skill dispatch system.

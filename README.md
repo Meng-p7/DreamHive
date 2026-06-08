@@ -44,7 +44,7 @@ After installation, open a new Claude Code session and you'll see:
 ### Discover skills for a task
 
 ```
-/dreamhive suggest review code and fix bugs
+/dreamhive-suggest review code and fix bugs
 ```
 
 Example output:
@@ -60,7 +60,7 @@ Example output:
 ### View cluster status
 
 ```
-/dreamhive status
+/dreamhive-status
 ```
 
 Example output:
@@ -83,7 +83,7 @@ Example output:
 ### Learn from usage patterns
 
 ```
-/dreamhive learn
+/dreamhive-learn
 ```
 
 Example output:
@@ -111,10 +111,10 @@ Example output:
 
 | Command | Description |
 |---------|-------------|
-| `/dreamhive status` | Dashboard: skill count, invocations, top skills |
-| `/dreamhive list [filter]` | List all indexed skills, with optional filter |
-| `/dreamhive suggest [query]` | Recommend Top-3 skills for a task |
-| `/dreamhive learn [generate N]` | Analyze patterns, generate composite skills |
+| `/dreamhive-status` | Dashboard: skill count, invocations, top skills |
+| `/dreamhive-list [filter]` | List all indexed skills, with optional filter |
+| `/dreamhive-suggest [query]` | Recommend Top-3 skills for a task |
+| `/dreamhive-learn [generate N]` | Analyze patterns, generate composite skills |
 
 ## 🏗️ Architecture
 
@@ -168,23 +168,24 @@ DreamHive/
 ├── .claude-plugin/
 │   ├── plugin.json              # Plugin manifest
 │   └── marketplace.json         # Marketplace listing
+├── .claude/
+│   ├── commands/
+│   │   ├── dreamhive-status.md      # /dreamhive-status
+│   │   ├── dreamhive-list.md        # /dreamhive-list
+│   │   ├── dreamhive-suggest.md     # /dreamhive-suggest
+│   │   └── dreamhive-learn.md       # /dreamhive-learn
+│   └── skills/
+│       ├── dreamhive-bootstrap/
+│       │   └── SKILL.md             # Capability description injected at startup
+│       ├── dreamhive-dispatch/
+│       │   └── SKILL.md             # Intelligent dispatch skill
+│       └── dreamhive-learn/
+│           └── SKILL.md             # Learning & evolution skill
 ├── hooks/
 │   ├── hooks.json               # Hook configuration
 │   └── session-start            # SessionStart hook (incremental index rebuild)
 ├── scripts/
 │   └── dreamhive.py             # Core engine (CLI)
-├── skills/
-│   ├── dreamhive-bootstrap/
-│   │   └── SKILL.md             # Capability description injected at startup
-│   ├── dreamhive-dispatch/
-│   │   └── SKILL.md             # Intelligent dispatch skill
-│   └── dreamhive-learn/
-│       └── SKILL.md             # Learning & evolution skill
-├── commands/
-│   ├── dreamhive-status.md      # /dreamhive status
-│   ├── dreamhive-list.md        # /dreamhive list
-│   ├── dreamhive-suggest.md     # /dreamhive suggest
-│   └── dreamhive-learn.md       # /dreamhive learn
 ├── agents/
 │   └── dreamhive-orchestrator.md # Orchestrator agent definition
 ├── data/                        # Persistent state (auto-generated)
@@ -265,7 +266,7 @@ Contributions welcome! Key improvement areas:
 - **Cross-language matching** — Chinese queries (e.g. "排错", "部署", "测试") now return correct skill recommendations via `data/term-map.json` synonym mapping (110+ terms). Mixed Chinese-English queries work seamlessly. The term map is zero-dependency and hand-maintained.
 - **Enhanced composite skill generation** — Auto-generated skills now include `Prerequisites` (auto-detected from step descriptions), `Context Passing Rules` (how output flows between steps), and `Error Degradation` (fallback strategy per step). This is the core of DreamHive's learning evolution.
 - **Incremental indexing** — Session-start indexing now uses SHA256 file hashing; only skills whose `SKILL.md` changed are re-parsed. Significant speedup with large skill collections.
-- **Dynamic status panel** — `/dreamhive status` box-drawing now uses `unicodedata.east_asian_width` for correct alignment with CJK characters and emojis. All content lines computed to uniform width dynamically.
+- **Dynamic status panel** — `/dreamhive-status` box-drawing now uses `unicodedata.east_asian_width` for correct alignment with CJK characters and emojis. All content lines computed to uniform width dynamically.
 - **Test suite** — 38 automated tests covering: keyword extraction, tokenization, scoring, frontmatter parsing, incremental indexing, status formatting, composite skill generation, and invocation archiving.
 
 ### v1.1.0 — Scoring, Source Detection & History

@@ -9,10 +9,12 @@ DreamHive auto-discovers, indexes, and recommends the best skill for each task �
 
 - **🔍 Auto-discovery** — Scans `~/.claude/skills/` and all plugins at session start
 - **🎯 Smart dispatch** — Keyword matching + fuzzy search + usage frequency → Top-3 recommendations
-- **🔗 Skill chaining** — Automatically chains multiple skills for complex tasks
+- **🌐 Cross-language** — Chinese queries work out-of-the-box via `data/term-map.json` synonym mapping
+- **🔗 Skill chaining** — Automatically chains multiple skills for complex tasks with context-passing rules and error degradation
 - **📊 Invocation tracking** — Records every call (success/failure) for learning
 - **🧠 Pattern learning** — Detects repeated skill sequences, suggests creating composite skills
-- **⚡ Zero config** — Works out of the box, no setup needed
+- **⚡ Incremental indexing** — Only re-parses skills whose files changed, via SHA256 hash caching
+- **🧪 Test suite** — 38 automated tests covering core functions
 
 ## 📦 Installation
 
@@ -64,16 +66,17 @@ Example output:
 Example output:
 ```
 ╔══════════════════════════════════════════════╗
-║         🐝  DreamHive Status               ║
+║  🐝  DreamHive Status                        ║
 ╠══════════════════════════════════════════════╣
-║  Skills indexed:        42                    ║
-║  Total invocations:    156                    ║
-║  Patterns detected:      3                    ║
+║  Skills indexed    :  42                     ║
+║  Total invocations :  156                    ║
+║  Patterns detected :  3                      ║
+║  Index built at    :  2026-06-08T12:00:00    ║
 ╠══════════════════════════════════════════════╣
-║  Top skills:                                  ║
-║    systematic-debugging            24 calls    ║
-║    writing-plans                   18 calls    ║
-║    requesting-code-review          15 calls    ║
+║  Top skills:                                 ║
+║  systematic-debugging  24 calls              ║
+║  writing-plans  18 calls                     ║
+║  requesting-code-review  15 calls            ║
 ╚══════════════════════════════════════════════╝
 ```
 
@@ -155,6 +158,9 @@ Each skill receives a composite score (0-100) based on:
 | Substring hits | 0-10 pts | Query word hit rate in skill description |
 | Usage frequency | 0-5 pts | log2(call_count) — popular skills get a small boost |
 
+**Cross-language support:** Chinese queries are automatically translated to English keywords
+via `data/term-map.json` before scoring. Mixed Chinese-English queries work seamlessly.
+
 ## 📁 File Structure
 
 ```
@@ -164,7 +170,7 @@ DreamHive/
 │   └── marketplace.json         # Marketplace listing
 ├── hooks/
 │   ├── hooks.json               # Hook configuration
-│   └── session-start            # SessionStart hook (rebuilds index)
+│   └── session-start            # SessionStart hook (incremental index rebuild)
 ├── scripts/
 │   └── dreamhive.py             # Core engine (CLI)
 ├── skills/
@@ -182,9 +188,12 @@ DreamHive/
 ├── agents/
 │   └── dreamhive-orchestrator.md # Orchestrator agent definition
 ├── data/                        # Persistent state (auto-generated)
-│   ├── skill-index.json         # Skill catalog + stats
+│   ├── skill-index.json         # Skill catalog + stats + file hashes
 │   ├── invocation-history.json  # Invocation log (last 500)
-│   └── learned-patterns.json    # Detected usage patterns
+│   ├── learned-patterns.json    # Detected usage patterns
+│   └── term-map.json            # Chinese ↔ English synonym mapping
+├── tests/
+│   └── test_dreamhive.py        # Automated test suite (38 tests)
 ├── README.md                    # This document
 ├── README_ZH.md                 # Chinese documentation
 └── LICENSE                      # MIT License
@@ -216,6 +225,12 @@ python3 ~/DreamHive/scripts/dreamhive.py suggest "debug Python tests"
 claude plugin validate ~/DreamHive
 ```
 
+### Run tests
+
+```bash
+python3 -m pytest tests/ -v
+```
+
 ## 📝 How It Works
 
 1. **Session start**: The `session-start` hook runs `dreamhive.py index`, scanning
@@ -244,6 +259,14 @@ Contributions welcome! Key improvement areas:
 - Integration with other plugin marketplaces
 
 ## 📝 Changelog
+
+### v1.2.0 — Cross-Language, Composite Skills & Quality
+
+- **Cross-language matching** — Chinese queries (e.g. "排错", "部署", "测试") now return correct skill recommendations via `data/term-map.json` synonym mapping (110+ terms). Mixed Chinese-English queries work seamlessly. The term map is zero-dependency and hand-maintained.
+- **Enhanced composite skill generation** — Auto-generated skills now include `Prerequisites` (auto-detected from step descriptions), `Context Passing Rules` (how output flows between steps), and `Error Degradation` (fallback strategy per step). This is the core of DreamHive's learning evolution.
+- **Incremental indexing** — Session-start indexing now uses SHA256 file hashing; only skills whose `SKILL.md` changed are re-parsed. Significant speedup with large skill collections.
+- **Dynamic status panel** — `/dreamhive status` box-drawing now uses `unicodedata.east_asian_width` for correct alignment with CJK characters and emojis. All content lines computed to uniform width dynamically.
+- **Test suite** — 38 automated tests covering: keyword extraction, tokenization, scoring, frontmatter parsing, incremental indexing, status formatting, composite skill generation, and invocation archiving.
 
 ### v1.1.0 — Scoring, Source Detection & History
 

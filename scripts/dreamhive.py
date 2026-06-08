@@ -15,10 +15,12 @@ Usage:
     python3 dreamhive.py stats <skill>             # Show usage stats for a skill
 """
 
+import hashlib
 import json
 import math
 import re
 import sys
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
@@ -39,6 +41,42 @@ SKILL_SEARCH_PATHS = [
 def ensure_data_dir():
     """Create data directory if it doesn't exist."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+_TERM_MAP_CACHE = None
+
+def load_term_map() -> dict:
+    """Load the cross-language term map (Chinese → English keywords)."""
+    global _TERM_MAP_CACHE
+    if _TERM_MAP_CACHE is not None:
+        return _TERM_MAP_CACHE
+    term_file = DATA_DIR / "term-map.json"
+    if term_file.exists():
+        try:
+            _TERM_MAP_CACHE = json.loads(term_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            _TERM_MAP_CACHE = {}
+    else:
+        _TERM_MAP_CACHE = {}
+    return _TERM_MAP_CACHE
+
+
+def _display_width(text: str) -> int:
+    """Calculate terminal display width, accounting for double-width CJK/emoji chars."""
+    w = 0
+    for ch in text:
+        if unicodedata.east_asian_width(ch) in ("W", "F"):
+            w += 2
+        else:
+            w += 1
+    return w
+
+
+def _compute_file_hash(path: Path) -> str:
+    """Compute SHA256 hash of a file's contents."""
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()[:16]
 
 
 # ── Index Management ──────────────────────────────────────────────────────
@@ -86,8 +124,13 @@ def detect_source(skill_path: Path) -> str:
     return "user"
 
 
-def scan_skills() -> list[dict]:
-    """Scan all skill search paths and return a list of skill descriptors."""
+def scan_skills(hash_cache: dict = None) -> list[dict]:
+    """Scan all skill search paths and return a list of skill descriptors.
+    When hash_cache is provided, only reparse files whose hash has changed;
+    unchanged files reuse cached metadata.
+    """
+    if hash_cache is None:
+        hash_cache = {}
     skills = []
     seen_names = set()
 
@@ -100,6 +143,21 @@ def scan_skills() -> list[dict]:
             # Skip overly deep paths (avoid scanning node_modules etc.)
             rel = skill_file.relative_to(search_path)
             if len(rel.parts) > 6:
+                continue
+
+            fhash = _compute_file_hash(skill_file)
+
+            # Incremental: reuse cached metadata if hash unchanged
+            if fhash in hash_cache:
+                cached = hash_cache[fhash]
+                cname = cached.get("name", skill_file.parent.name)
+                if cname in seen_names:
+                    continue
+                seen_names.add(cname)
+                skill_entry = dict(cached)
+                skill_entry["path"] = str(skill_file)
+                skill_entry["file_hash"] = fhash
+                skills.append(skill_entry)
                 continue
 
             meta = parse_skill_frontmatter(skill_file)
@@ -129,6 +187,7 @@ def scan_skills() -> list[dict]:
                 "path": str(skill_file),
                 "source": source,
                 "keywords": keywords,
+                "file_hash": fhash,
             })
 
     return skills
@@ -161,6 +220,27 @@ def extract_keywords(text: str) -> list[str]:
     words = re.findall(r'[a-z][a-z0-9_-]{2,}', text.lower())
     keywords = [w for w in words if w not in stop_words]
 
+    # Cross-language: translate Chinese terms to English keywords
+    term_map = load_term_map()
+    if term_map:
+        # Find Chinese character sequences
+        cjk_terms = re.findall(r'[一-鿿㐀-䶿]+', text)
+        for term in cjk_terms:
+            translated = term_map.get(term, "")
+            if translated:
+                for w in translated.lower().split():
+                    if w not in stop_words and w not in keywords:
+                        keywords.append(w)
+            # Also check 2-char substrings for partial matches
+            if not translated and len(term) >= 2:
+                for i in range(len(term) - 1):
+                    sub = term[i:i + 2]
+                    sub_trans = term_map.get(sub, "")
+                    if sub_trans:
+                        for w in sub_trans.lower().split():
+                            if w not in stop_words and w not in keywords:
+                                keywords.append(w)
+
     # Extract quoted phrases as high-value keywords
     quoted = re.findall(r'"([^"]+)"', text)
     for phrase in quoted:
@@ -172,10 +252,33 @@ def extract_keywords(text: str) -> list[str]:
 # ── TF-IDF Scoring ───────────────────────────────────────────────────────
 
 def tokenize(text: str) -> list[str]:
-    """Tokenize text into lowercase word tokens for TF-IDF."""
+    """Tokenize text into lowercase word tokens for TF-IDF. Supports CJK via term map."""
     if not text:
         return []
-    return re.findall(r'[a-z][a-z0-9_-]+', text.lower())
+    tokens = re.findall(r'[a-z][a-z0-9_-]+', text.lower())
+    # Translate CJK characters using term map
+    term_map = load_term_map()
+    if term_map:
+        cjk_terms = re.findall(r'[一-鿿㐀-䶿]+', text)
+        for term in cjk_terms:
+            # Try exact match first, then substrings
+            if term in term_map:
+                tokens.extend(term_map[term].lower().split())
+            elif len(term) == 1:
+                trans = term_map.get(term, "")
+                if trans:
+                    tokens.extend(trans.lower().split())
+            else:
+                for ch in term:
+                    trans = term_map.get(ch, "")
+                    if trans:
+                        tokens.extend(trans.lower().split())
+                for i in range(len(term) - 1):
+                    sub = term[i:i + 2]
+                    trans = term_map.get(sub, "")
+                    if trans:
+                        tokens.extend(trans.lower().split())
+    return tokens
 
 
 def compute_doc_freq(skills: list[dict]) -> tuple:
@@ -217,15 +320,24 @@ def tfidf_similarity(query_tokens: list, doc_tokens: list, df: dict, n_docs: int
 
 
 def build_index():
-    """Scan skills and write the index file."""
+    """Scan skills and write the index file. Uses incremental hashing
+    to skip re-parsing files whose contents haven't changed."""
     ensure_data_dir()
-    skills = scan_skills()
 
-    # Load existing index to preserve call counts
+    # Build hash cache from existing index for incremental scan
     existing = load_index()
+    hash_cache = {}
+    for s in existing.get("skills", []):
+        fh = s.get("file_hash", "")
+        if fh:
+            hash_cache[fh] = s
+
+    skills = scan_skills(hash_cache)
+
+    # Build map of existing skills for metadata merge
     existing_map = {s["name"]: s for s in existing.get("skills", [])}
 
-    # Merge call counts from existing data
+    # Merge call counts and stats from existing data
     for skill in skills:
         if skill["name"] in existing_map:
             old = existing_map[skill["name"]]
@@ -420,6 +532,13 @@ def suggest_skills(query: str, top_n: int = 3) -> list[dict]:
     query_words = set(extract_keywords(query_lower))
     # Keep raw words for substring matching
     raw_words = set(re.findall(r'[a-z]{3,}', query_lower))
+    # Add translated CJK terms to raw_words
+    term_map = load_term_map()
+    if term_map:
+        for cjk in re.findall(r'[一-鿿㐀-䶿]+', query):
+            translated = term_map.get(cjk, "")
+            if translated:
+                raw_words.update(translated.lower().split())
 
     # Pre-compute TF-IDF corpus data (once for all skills)
     n_docs = len(skills)
@@ -624,22 +743,58 @@ def analyze_patterns() -> dict:
 def generate_skill_file(suggestion: dict) -> str:
     """
     Generate a new composite SKILL.md file from a pattern suggestion.
+    Includes context-passing rules, prerequisites, and error degradation.
     Returns the path where the file was written.
     """
     skills_chain = suggestion.get("skills_chain", [])
     name = suggestion.get("suggested_name", "auto-composite")
     desc = suggestion.get("suggested_description", "")
 
-    # Load descriptions for each skill in the chain
+    # Load descriptions and metadata for each skill in the chain
     index = load_index()
     skill_map = {s["name"]: s for s in index.get("skills", [])}
 
     steps = []
-    for i, skill_name in enumerate(skills_chain, 1):
+    context_rules = []
+    prerequisites = set()
+    fallbacks = []
+
+    for i, skill_name in enumerate(skills_chain):
         skill_info = skill_map.get(skill_name, {})
         skill_desc = skill_info.get("description", f"Execute {skill_name}")
-        steps.append(f"{i}. Invoke `{skill_name}` — {skill_desc}")
+        steps.append(f"{i + 1}. Invoke `{skill_name}` — {skill_desc}")
 
+        # Context-passing: describe how output flows between steps
+        if i < len(skills_chain) - 1:
+            next_name = skills_chain[i + 1]
+            context_rules.append(
+                f"- **Step {i + 1} → {i + 2}**: Pass the output of "
+                f"`{skill_name}` as context to `{next_name}`. "
+                f"Include relevant findings, code references, or decisions."
+            )
+
+        # Prerequisites: extract from skill description keywords
+        desc_lower = skill_desc.lower()
+        if any(w in desc_lower for w in ("test", "spec", "assert")):
+            prerequisites.add("Test suite must be available and passing")
+        if any(w in desc_lower for w in ("deploy", "publish", "release")):
+            prerequisites.add("Code must be committed and CI checks must pass")
+        if any(w in desc_lower for w in ("review", "pr", "merge")):
+            prerequisites.add("Changes must be on a feature branch")
+
+        # Error degradation: step-specific fallback
+        fallbacks.append(
+            f"- **Step {i + 1} (`{skill_name}`) fails**: "
+            f"Retry once with simplified input. "
+            f"If still failing, log the error context and skip to "
+            f"step {min(i + 2, len(skills_chain))} with a warning."
+        )
+
+    # Build prerequisite section (generic defaults + detected ones)
+    prerequisites.add("All preceding steps completed successfully")
+    prereq_lines = "\n".join(f"- {p}" for p in sorted(prerequisites))
+
+    # Build the full template
     content = f"""---
 name: {name}
 description: "{desc}"
@@ -657,14 +812,27 @@ This skill was auto-detected because the following sequence appeared
 
 {' → '.join(skills_chain)}
 
+## Prerequisites
+
+{prereq_lines}
+
 ## Steps
 
 {chr(10).join(steps)}
 
+## Context Passing Rules
+
+{chr(10).join(context_rules)}
+
+## Error Degradation
+
+If any step in this chain fails, apply the following fallback strategy:
+
+{chr(10).join(fallbacks)}
+
 ## Notes
 
 - This skill is auto-generated. Review and customize as needed.
-- Each step's output is passed as context to the next step.
 - Edit: modify this file directly, or regenerate via `/dreamhive learn`.
 """
 
@@ -680,7 +848,7 @@ This skill was auto-detected because the following sequence appeared
 # ── Status & Formatting ───────────────────────────────────────────────────
 
 def format_status() -> str:
-    """Format a human-readable status report."""
+    """Format a human-readable status report with dynamic-width box."""
     index = load_index()
     history = load_history()
     patterns = load_patterns()
@@ -688,8 +856,9 @@ def format_status() -> str:
     total_skills = index.get("total_skills", 0)
     total_invocations = history.get("total_invocations", 0)
     built_at = index.get("built_at", "never")
+    pattern_count = len(patterns.get("patterns", []))
 
-    # Most recent 10 invocations
+    # Recent invocations
     recent = history.get("entries", [])[-10:]
     recent_lines = []
     for entry in recent:
@@ -697,7 +866,7 @@ def format_status() -> str:
         skill = entry.get("skill", "?")
         result = entry.get("result", "?")
         icon = "✓" if result == "ok" else "✗"
-        recent_lines.append(f"  {icon} {skill:30s}  {ts}")
+        recent_lines.append(f"  {icon} {skill}  {ts}")
 
     # Most-used skills
     top_skills = sorted(
@@ -709,34 +878,51 @@ def format_status() -> str:
     for s in top_skills:
         count = s.get("call_count", 0)
         if count > 0:
-            top_lines.append(f"  {s['name']:30s}  {count} calls")
+            top_lines.append(f"  {s['name']}  {count} calls")
 
-    # Pattern count
-    pattern_count = len(patterns.get("patterns", []))
-
-    lines = [
-        "╔══════════════════════════════════════════════╗",
-        "║         🐝  DreamHive Status               ║",
-        "╠══════════════════════════════════════════════╣",
-        f"║  Skills indexed:   {total_skills:>6}                    ║",
-        f"║  Total invocations:{total_invocations:>6}                    ║",
-        f"║  Patterns detected:{pattern_count:>6}                    ║",
-        f"║  Index built at: {built_at[:19]}    ║",
-        "╠══════════════════════════════════════════════╣",
+    # Compute content lines and dynamic width
+    header = "  \U0001f41d  DreamHive Status"
+    content_lines = [
+        header,
+        None,  # separator
+        f"  Skills indexed    :  {total_skills}",
+        f"  Total invocations :  {total_invocations}",
+        f"  Patterns detected :  {pattern_count}",
+        f"  Index built at    :  {built_at[:19]}",
+        None,
     ]
 
     if top_lines:
-        lines.append("║  Top skills:                                  ║")
-        for line in top_lines:
-            lines.append(f"║  {line:44s}║")
-        lines.append("╠══════════════════════════════════════════════╣")
+        content_lines.append("  Top skills:")
+        content_lines.extend(top_lines)
+        content_lines.append(None)
 
     if recent_lines:
-        lines.append("║  Recent invocations:                          ║")
-        for line in recent_lines:
-            lines.append(f"║  {line:44s}║")
+        content_lines.append("  Recent invocations:")
+        content_lines.extend(recent_lines)
 
-    lines.append("╚══════════════════════════════════════════════╝")
+    # Dynamic width: max display width + padding, minimum 46
+    max_w = max(_display_width(l) for l in content_lines if l is not None)
+    inner_w = max(max_w + 2, 46)
+    h = "═" * inner_w
+
+    def box_line(text):
+        pad = inner_w - _display_width(text)
+        return f"║{text}{' ' * pad}║"
+
+    lines = [
+        f"╔{h}╗",
+        box_line(header),
+        f"╠{h}╣",
+    ]
+
+    for item in content_lines[2:]:
+        if item is None:
+            lines.append(f"╠{h}╣")
+        else:
+            lines.append(box_line(item))
+
+    lines.append(f"╚{h}╝")
     return "\n".join(lines)
 
 

@@ -150,7 +150,7 @@ claude plugin install dreamhive@dreamhive-marketplace
 |------|------|------|
 | 关键词重叠 | 0-40 分 | Jaccard 相似度 + 双向子串匹配 |
 | 名称匹配 | 0-25 分 | 查询中直接/间接包含技能名称 |
-| 文本相似度 | 0-20 分 | SequenceMatcher 模糊匹配描述 |
+| TF-IDF 相似度 | 0-20 分 | TF-IDF 向量余弦相似度 |
 | 子串命中 | 0-10 分 | 查询词在技能描述中的命中率 |
 | 使用频率 | 0-5 分 | log2(调用次数) — 热门技能小幅加分 |
 
@@ -240,6 +240,12 @@ claude plugin validate ~/DreamHive
 - 与其他插件市场的集成
 
 ## 📝 更新日志
+
+### v1.1.0 — 评分算法、源检测与历史归档
+
+- **TF-IDF 评分算法** — 将 SequenceMatcher（评分3）替换为 TF-IDF 余弦相似度。稀有、有区分度的词权重更高。零依赖，实时计算。
+- **健壮的源检测** — 插件来源改为从 `.claude-plugin/plugin.json` 清单文件读取，不再依赖硬编码路径假设。无论缓存目录结构如何变化都能正常工作。
+- **按月归档历史** — 调用历史按月归档（`invocation-history-YYYY-MM.json`），旧数据不再在 500 条时被丢弃，保留长期学习能力。`analyze_patterns()` 回溯 3 个月数据。
 
 ### v1.0.1 — 可靠性改进
 

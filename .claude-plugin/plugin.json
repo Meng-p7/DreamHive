@@ -1,7 +1,7 @@
 {
   "name": "dreamhive",
   "description": "Claude Code Intelligent Skill Dispatch — auto-discover, index, dispatch, and evolve your skills. Solves context overload when installing many skills.",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "author": {
     "name": "DreamHive Contributors"
   },

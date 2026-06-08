@@ -5,7 +5,7 @@
     },
     "metadata": {
         "description": "DreamHive — Claude Code Intelligent Skill Dispatch Plugin",
-        "version": "1.0.2"
+        "version": "1.1.0"
     },
     "plugins": [
         {
@@ -15,7 +15,7 @@
                 "url": "https://github.com/Meng-p7/DreamHive.git"
             },
             "description": "Claude Code Intelligent Skill Dispatch — track every skill invocation, learn your workflow patterns, and auto-generate composite skills from repeated sequences. Pure local, zero dependencies.",
-            "version": "1.0.2",
+            "version": "1.1.0",
             "strict": true
         }
     ]

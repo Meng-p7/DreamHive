@@ -151,7 +151,7 @@ Each skill receives a composite score (0-100) based on:
 |-----------|--------|--------|
 | Keyword overlap | 0-40 pts | Jaccard similarity + bidirectional substring matching |
 | Name matching | 0-25 pts | Direct/indirect skill name presence in query |
-| Text similarity | 0-20 pts | SequenceMatcher fuzzy match on description |
+| TF-IDF similarity | 0-20 pts | Cosine similarity with TF-IDF vectors |
 | Substring hits | 0-10 pts | Query word hit rate in skill description |
 | Usage frequency | 0-5 pts | log2(call_count) — popular skills get a small boost |
 
@@ -244,6 +244,12 @@ Contributions welcome! Key improvement areas:
 - Integration with other plugin marketplaces
 
 ## 📝 Changelog
+
+### v1.1.0 — Scoring, Source Detection & History
+
+- **TF-IDF scoring** — Replaced SequenceMatcher (Score 3) with TF-IDF cosine similarity. Rare, discriminative terms now weighted higher than common ones. Zero dependencies, computed on-the-fly.
+- **Robust source detection** — Plugin source now read from `.claude-plugin/plugin.json` manifests instead of hardcoded path assumptions. Works regardless of cache directory structure.
+- **Monthly history archiving** — Invocation history now archived by month (`invocation-history-YYYY-MM.json`). Old data preserved for long-term pattern learning instead of being discarded at 500 records. `analyze_patterns()` looks back 3 months.
 
 ### v1.0.2 — Context Optimization
 
